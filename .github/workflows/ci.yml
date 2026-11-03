@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check syntax
+        run: |
+          for f in background/*.js common/*.js offscreen/*.js popup/*.js scripts/*.mjs dev/*.js dev/*.mjs; do
+            node --check "$f"
+          done
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Package
+        run: node scripts/build.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sound-chef-zip
+          path: dist/*.zip
+          if-no-files-found: error

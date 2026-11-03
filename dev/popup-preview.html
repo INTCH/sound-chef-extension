@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sound Chef popup preview</title>
+<link rel="stylesheet" href="../popup/popup.css">
+<!--
+  Development only. Renders the real popup markup, stylesheet and script against
+  dev/chrome-mock.js. Serve the repository over HTTP (npm run preview) and open
+  /dev/popup-preview.html; see chrome-mock.js for the query parameters.
+-->
+</head>
+<body>
+<script type="module">
+  import './chrome-mock.js';
+
+  const html = await (await fetch('../popup/popup.html')).text();
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const script of doc.body.querySelectorAll('script')) script.remove();
+  document.body.innerHTML = doc.body.innerHTML;
+
+  await import('../popup/popup.js');
+</script>
+</body>
+</html>

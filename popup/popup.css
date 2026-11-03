@@ -1,0 +1,430 @@
+/*
+ * Sound Chef popup.
+ *
+ * One dark meter well over a quiet control panel — the meter is the only place
+ * colour is spent, because it is the only place colour carries meaning (green /
+ * amber / red are level zones, not decoration). Everything else is graphite on
+ * paper so the eye goes to the bars.
+ *
+ * Chrome-only stylesheet: `::-webkit-slider-*`, `cqw` and `color-mix()` are all
+ * used without fallbacks, which is safe in an MV3 popup and nowhere else.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --surface: #f3f4f6;
+  --card: #ffffff;
+  --ink: #1a1c1e;
+  --ink-soft: #6b7178;
+  --line: #e3e5e8;
+  --line-strong: #cdd0d5;
+
+  --ctl: #3b4046;      /* slider fill, pressed button */
+  --ctl-track: #dcdee2;
+  --thumb: #ffffff;
+  --thumb-edge: rgba(0, 0, 0, 0.28);
+
+  /* The meter well stays dark in both themes: a level bar needs a dark ground to
+     read at a glance, the same reason hardware meters have one. */
+  --well: #17181b;
+  --well-edge: #0d0e10;
+  --bar-track: #242629;
+  --grn: #3ea96c;
+  --amb: #d3a03c;
+  --red: #cd4f49;
+  --cap: rgba(255, 255, 255, 0.85);
+  --chan-id: #7b818a;
+
+  --warn: #b8433c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1b1d20;
+    --card: #26282c;
+    --ink: #e8eaec;
+    --ink-soft: #979da4;
+    --line: #303338;
+    --line-strong: #3d4046;
+
+    --ctl: #c8ccd1;
+    --ctl-track: #3a3d43;
+    --thumb: #f1f2f4;
+    --thumb-edge: rgba(0, 0, 0, 0.5);
+
+    --well: #101114;
+    --well-edge: #000000;
+    --bar-track: #1f2125;
+
+    --warn: #e0736c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 268px;
+  margin: 0;
+  padding: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Meter                                                                       */
+/* -------------------------------------------------------------------------- */
+
+.meter {
+  position: relative;
+  padding: 9px 10px 7px;
+  border-radius: 7px;
+  background: var(--well);
+  box-shadow:
+    inset 0 0 0 1px var(--well-edge),
+    inset 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* Nothing is being processed. The bars decay to empty on their own, which is the
+   real signal; fading the whole well would only turn it grey against a light page
+   and would say "broken" rather than "quiet". Only the channel letters step back. */
+.meter[data-mode="idle"] .chan-id {
+  opacity: 0.5;
+}
+
+.meter-head {
+  display: flex;
+  justify-content: flex-end;
+  height: 6px;
+  margin-bottom: 3px;
+}
+
+/* Over-ceiling indicator. Latched by JS for ~700 ms so a single sample that hits
+   the tab limiter is still visible on a 100 ms poll. */
+.over {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2c2e33;
+  transition: background 120ms linear, box-shadow 120ms linear;
+}
+
+.meter[data-clip="true"] .over {
+  background: var(--red);
+  box-shadow: 0 0 5px rgba(205, 79, 73, 0.75);
+}
+
+.chan {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.chan-id {
+  width: 8px;
+  color: var(--chan-id);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.bar {
+  position: relative;
+  flex: 1;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--bar-track);
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+/* The fill is a clipping window, not a coloured block: the gradient inside is
+   always the full width of the bar, so a given dB level always lands on the same
+   colour no matter how far the fill currently reaches. */
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.grad {
+  display: block;
+  width: 100cqw;
+  height: 100%;
+  /* -60..0 dBFS: green to -18, amber to -6, red into the ceiling. */
+  background: linear-gradient(
+    to right,
+    var(--grn) 0 68%,
+    var(--amb) 72% 88%,
+    var(--red) 93% 100%
+  );
+}
+
+/* Peak hold: the true sample peak, held then falling, over the RMS fill. */
+.cap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--cap);
+  opacity: 0;
+}
+
+.scale {
+  position: relative;
+  height: 4px;
+  margin: 2px 0 0 14px;
+}
+
+.scale i {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 3px;
+  margin-left: -1px;
+  background: #34373d;
+}
+
+.scale i.major {
+  height: 4px;
+  background: #575b62;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Controls                                                                    */
+/* -------------------------------------------------------------------------- */
+
+.controls {
+  margin: 10px 0 0;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 50px 1fr 46px;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.row label {
+  color: var(--ink-soft);
+}
+
+.row output {
+  color: var(--ink);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 18px;
+}
+
+.slot-plain {
+  justify-content: flex-start;
+}
+
+/* The unity / centre notch sits under the track, inset by half a thumb so it
+   lines up with the thumb centre rather than with the raw element edge. */
+.notch {
+  position: absolute;
+  bottom: 0;
+  width: 1px;
+  height: 4px;
+  margin-left: -1px;
+  background: var(--line-strong);
+  pointer-events: none;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  /* `--pf` (0..1) is what JS writes. The thumb centre travels from one radius in
+     to one radius short of the far edge, so the track fill has to be mapped over
+     the same shortened span or the colour boundary drifts away from the thumb. */
+  --pf: 0;
+  --p: calc(6px + var(--pf) * (100% - 12px));
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--ctl) 0 var(--p),
+    var(--ctl-track) var(--p) 100%
+  );
+}
+
+/* Balance fills outward from centre, so the empty state is a bare track and the
+   filled part reads as "how far off centre", not "how much". */
+input[type="range"].centred::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--ctl-track) 0 min(50%, var(--p)),
+    var(--ctl) min(50%, var(--p)) max(50%, var(--p)),
+    var(--ctl-track) max(50%, var(--p)) 100%
+  );
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: var(--thumb);
+  box-shadow:
+    0 0 0 1px var(--thumb-edge),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  background: color-mix(in srgb, var(--thumb) 90%, var(--ctl));
+}
+
+.switch {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  width: 30px;
+  height: 17px;
+  margin: 0;
+  border-radius: 9px;
+  background: var(--ctl-track);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--thumb);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: transform 120ms ease;
+}
+
+.switch:checked {
+  background: var(--ctl);
+}
+
+.switch:checked::after {
+  transform: translateX(13px);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Actions                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+button {
+  height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--card) 93%, var(--ink));
+}
+
+button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--card) 86%, var(--ink));
+}
+
+/* Muted is a state, not an event: the button stays filled while it holds. */
+#mute-btn[data-on="true"] {
+  background: var(--ctl);
+  border-color: var(--ctl);
+  color: var(--card);
+}
+
+#mute-btn[data-on="true"]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ctl) 88%, var(--card));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Status                                                                      */
+/* -------------------------------------------------------------------------- */
+
+/* Only ever shown when something is wrong — a working popup says nothing.
+   `display:flex` here would beat the UA's `[hidden] { display: none }`, so the
+   hidden case has to be restated. */
+.status[hidden] {
+  display: none;
+}
+
+.status {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 8px 0 0;
+  color: var(--warn);
+  font-size: 11px;
+}
+
+.status::before {
+  content: "";
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateY(-1px);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared states                                                               */
+/* -------------------------------------------------------------------------- */
+
+:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ctl);
+  outline-offset: 2px;
+}
+
+input[type="range"]:focus-visible {
+  outline-offset: -1px;
+}

@@ -1,0 +1,17 @@
+{
+  "name": "sound-chef",
+  "version": "0.2.0",
+  "description": "Chrome extension: per-tab volume boost up to 600%, mono downmix and left/right balance, with a live level meter.",
+  "private": true,
+  "type": "module",
+  "author": "iefedev",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "preview": "node dev/serve.mjs"
+  }
+}

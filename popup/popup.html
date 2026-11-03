@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Sound Chef</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!--
+    The meter is deliberately wordless: levels are shown as geometry, not as dB
+    readouts. `data-mode` ('live' | 'idle') is the hook the stylesheet reads;
+    `data-clip` latches the over indicator.
+  -->
+  <div class="meter" id="meter" data-mode="idle" data-clip="false">
+    <div class="meter-head">
+      <span class="over" id="over-led" title="output at the limiter ceiling"></span>
+    </div>
+
+    <div class="chan">
+      <span class="chan-id">L</span>
+      <div class="bar"><span class="fill" id="fill-l"><span class="grad"></span></span><span class="cap" id="cap-l"></span></div>
+    </div>
+
+    <div class="chan">
+      <span class="chan-id">R</span>
+      <div class="bar"><span class="fill" id="fill-r"><span class="grad"></span></span><span class="cap" id="cap-r"></span></div>
+    </div>
+
+    <!-- Unlabelled ticks: -48 -36 -24 -18 -12 -6 0 dBFS over a -60..0 scale. -->
+    <div class="scale">
+      <i style="left:20%"></i><i style="left:40%"></i><i style="left:60%"></i>
+      <i style="left:70%"></i><i style="left:80%"></i><i style="left:90%"></i>
+      <i class="major" style="left:100%"></i>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <label for="volume">Volume</label>
+      <div class="slot">
+        <input type="range" id="volume" min="0" max="6" step="0.01" value="1">
+        <span class="notch" id="volume-notch"></span>
+      </div>
+      <output id="volume-value">100%</output>
+    </div>
+
+    <div class="row">
+      <label for="balance">Balance</label>
+      <div class="slot">
+        <input type="range" id="balance" class="centred" min="-1" max="1" step="0.01" value="0">
+        <span class="notch" style="left:50%"></span>
+      </div>
+      <output id="balance-value">centre</output>
+    </div>
+
+    <div class="row">
+      <label for="mono">Mono</label>
+      <div class="slot slot-plain">
+        <input type="checkbox" id="mono" class="switch">
+      </div>
+      <output></output>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button type="button" id="mute-btn" data-on="false">Mute</button>
+    <button type="button" id="reset-btn" title="Back to 100% / stereo / centre, and stops capture immediately">Reset</button>
+  </div>
+
+  <p id="status-line" class="status" hidden></p>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
