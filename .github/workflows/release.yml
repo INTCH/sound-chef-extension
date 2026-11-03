@@ -38,4 +38,4 @@ jobs:
         run: |
           gh release create "${GITHUB_REF_NAME}" "dist/sound-chef-${VERSION}.zip" \
             --title "Sound Chef ${VERSION}" \
-            --generate-notes
+            --notes "Unzip **sound-chef-${VERSION}.zip** and load the folder in chrome://extensions with Developer mode on (Load unpacked); see the README."
